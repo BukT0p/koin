@@ -1,308 +1,591 @@
 ![logo](./img/insert_koin_android_logo.jpg)
 
-### What's KOIN?
+## What's KOIN?
 
-KOIN is a simple (but powerful) dependency injection framework for Android. It uses [Kotlin](https://kotlinlang.org/) and its functional power to get things done!  No proxy/CGLib, no code generation, no introspection. Just functional Kotlin and DSL magic ;)
+A small library for writing dependency injection in a concise and pragmatic way. No proxy, no code generation, no introspection. Just DSL and functional Kotlin magic!
 
-KOIN is a very small library, that aims to be as simple as possible and let's you write dependency injection in a breath.
+`Declare, Start, Inject`
 
-*Just describe your stuff and inject it!*
+## Official website - https://insert-koin.io
 
-#### New web site is coming :)
+* All documentation, sample and references has been move to our website. Check the official website to get started: [insert-koin.io](https://insert-koin.io)
+* Koin samples project are located here: [koin-samples @ github](https://github.com/Ekito/koin-samples)
+* The essentials of Koin API for Android developer: [Android Developer Quick Reference](https://insert-koin.io/docs/1.0/quick-reference/android/) 
 
-### What's up?
+You can check the **[getting started](https://insert-koin.io/docs/1.0/getting-started/introduction/)** section from our website, to discover Koin with the favorite platform. Or follow the snippets below.
 
-Check the latest changes in [What's New](https://github.com/Ekito/koin/wiki/What's-new-%3F). For users using a version prior to Koin 0.6.x, please refer the [migrating to 0.6.0](https://github.com/Ekito/koin/wiki/Migrating#migrating-to-06x) page to understand the latest changes. 
+## Actual Version
+
+```gradle
+koin_version = '0.9.1'
+```
+
+## New features
+
+* DSL upgrade: now use the `bean` and `factory` keywords
+* Context scope isolation
+* Context callbacks - be notified when a context is release with `registerContextCallBack()`
+* Inject dynamic parameters into your definitions: `bean { params -> MyPresenter(params["activity"])}` and inject parameters with `by inject(parameters=mapOf("activity" to ...))`
+
+
+# Table of Content
+
+Getting Started
+
+* [Your first dependency with Android](#your-first-dependency-with-android)
+* [Your first dependency with Android and ViewModel](#your-first-dependency-with-android-viewmodel)
+* [Your first SparkJava Controller with Koin](#your-first-sparkjava-controller-with-koin)
+* [Unit Testing with Koin](#unit-testing-with-koin)
+
+Koin Quick reference
+
+* [The Koin DSL in 5 minutes](#the-koin-dsl-in-5-minutes)
+* [The Android Quick Reference](#android)
+* [The Spark Quick Reference](#sparkjava)
+
+
+# Setup
+
+Check that you have the `jcenter` repository. 
+
+```gradle
+// Add Jcenter to your repositories if needed
+repositories {
+	jcenter()    
+}
+```
+
+Choose your the Koin module:
+
+```gradle
+// Koin for Kotlin
+compile "org.koin:koin-core:$koin_version"
+
+// Koin for Android
+compile "org.koin:koin-android:$koin_version"
+
+// Koin for Android Architecture Components
+compile "org.koin:koin-android-architecture:$koin_version"
+
+// Koin for Spark Kotlin
+compile "org.koin:koin-spark:$koin_version"
+
+// Koin for Ktor Kotlin
+compile "org.koin:koin-ktor:$koin_version"
+
+// Koin for JUnit tests
+testCompile "org.koin:koin-test:$koin_version"
+```
+
 
 # Getting Started
 
-## Gradle
+## Your first dependency with Android
 
-Check that you have the `jcenter` repository. Choose the needed depedency:
+### Gradle
 
 ```gradle
-
-// Add Jcenter to your repositories if needed
-repositories {
-        jcenter()    
-}
-
-// Koin for Android
-compile 'org.koin:koin-android:0.6.0'
-
-// Koin Testing tools
-testCompile 'org.koin:koin-test:0.6.0'
+compile "org.koin:koin-android:$koin_version"
 ```
 
-### Setup your Application
+### Declaring our first dependencies
 
-To start KOIN and your modules, you just have to use the `startKoin()` function in your Android *Application* class like below:
+Let's create a Repository to provide some data (`giveHello()`):
 
-```Kotlin
-class MainApplication : Application(){
+```kotlin
+interface Repository {
+    fun giveHello()
+}
 
+class MyRepository() : Repository {
+    override fun giveHello() = "Hello Koin"
+}
+```
+
+A Presenter class, for consuming this data:
+
+```kotlin
+// Use Repository - injected by constructor by Koin
+class MyPresenter(val repository : Repository){
+    fun sayHello() = repository.giveHello()
+}
+```
+
+Use the `applicationContext` function to **declare a module**. Let's write our dependencies via **constructor injection**:
+
+```kotlin
+// Koin module
+val myModule : Module = applicationContext {
+    factory { MyPresenter(get()) } // get() will resolve Repository instance
+    bean { MyRepository() as Repository }
+}
+```
+
+By using the *factory* definition for our presenter, we will obtain a new instance each time we ask about the `MyPresenter` class.
+
+### Start Koin
+
+Now that we have a module, let's start it with Koin. Open your application class, or make one (don't forget to declare it in your manifest.xml). Just call the `startKoin()` function:
+
+```kotlin
+class MyApplication : Application(){
     override fun onCreate() {
         super.onCreate()
         // Start Koin
-        startKoin(this, /* your list of modules */)
+        startKoin(this, listOf(myModule))
     }
 }
 ```
 
-The `startKoin` function requires an `Application` instance, and a a list of modules to run. 
+### Injecting dependencies
 
-## Declaring your dependencies
+The `MyPresenter` component will be created with `Repository` instance. To get it from our Activity, let's inject it with the `by inject()` delegate injector (we can't directly create Activitiy instances from Koin): 
 
-To declare your dependencies, you have to declare it in **modules**.
+```kotlin
+class MyActivity : AppCompatActivity(){
 
-To create a module, make a class and **extends** your `AndroidModule`. Implements the `context()` function by using the `applicationContext` function builder like below:
+    // Inject MyPresenter
+    val presenter : MyPresenter by inject()
 
-```Kotlin
-class WeatherModule : AndroidModule() {
-    override fun context() = applicationContext {
-        // WeatherActivity context
-        context(name = "WeatherActivity") {
-            // Provide a factory for presenter WeatherContract.Presenter
-            provide { WeatherPresenter(get()) }
-        }
+    override fun onCreate() {
+        super.onCreate()
+        // Let's use our presenter
+        Log.i("MyActivity","presenter : ${presenter.sayHello()}")
+    }
+}
+```
+
+
+## Your first dependency with Android ViewModel
+
+### Gradle
+
+```gradle
+compile "org.koin:koin-android-architecture:$koin_version"
+```
+
+### Declaring our first dependencies
+
+Let's create a Repository to provide some data (`giveHello()`):
+
+```kotlin
+interface Repository {
+    fun giveHello()
+}
+
+class MyRepository() : Repository {
+    override fun giveHello() = "Hello Koin"
+}
+```
+
+A ViewModel class, for consuming this data:
+
+```kotlin
+// Use Repository - injected by constructor by Koin
+class MyViewModel(val repository : Repository) : ViewModel(){
+    fun sayHello() = repository.giveHello()
+}
+```
+
+Use the `applicationContext` function to **declare a module**. Let's write our dependencies via **constructor injection**:
+
+```kotlin
+// Koin module
+val myModule : Module = applicationContext {
+    viewModel { MyViewModel(get()) } // get() will resolve Repository instance
+    bean { MyRepository() as Repository }
+}
+```
+
+We are also using the `viewModel` keyword to declare an Android ViewModel component.
+
+### Start Koin
+
+Now that we have a module, let's start it with Koin. Open your application class, or make one (don't forget to declare it in your manifest.xml). Just call the `startKoin()` function:
+
+```kotlin
+class MyApplication : Application(){
+    override fun onCreate() {
+        super.onCreate()
+        // Start Koin
+        startKoin(this, listOf(myModule))
+    }
+}
+```
+
+### Injecting dependencies
+
+The `MyViewModel` component will be created with `Repository` instance. To get it from our Activity, let's inject it with the `by viewModel()` delegate injector (we can't directly create Activitiy instances from Koin): 
+
+```kotlin
+class MyActivity : AppCompatActivity(){
+
+    // Inject MyViewModel
+    val myViewModel : MyViewModel by viewModel()
+
+    override fun onCreate() {
+        super.onCreate()
+        // Let's use our ViewModel
+        Log.i("MyActivity","ViewModel : ${myViewModel.sayHello()}")
+    }
+}
+```
+
+Or if you want to eagerly create your ViewModel in a function, just use the `getViewModel()`:
+
+```kotlin
+class MyActivity : AppCompatActivity(){
+
+    override fun onCreate() {
+        super.onCreate()
         
-        // Weather data repository
-        provide { WeatherRepository(get()) }
-        
-        // Local Weather DataSource 
-        provide { LocalDataSource(AndroidReader(applicationContext) } bind WeatherDatasource::class
-    }
-}
+        val myViewModel : MyViewModel = getViewModel()
 
-//for classes
-class WeatherPresenter(val weatherRepository: WeatherRepository)
-class WeatherRepository(val weatherDatasource: WeatherDatasource)
-class LocalDataSource(val jsonReader: JsonReader) : WeatherDatasource
-```
-Your module then provides an *applicationContext* (description of your components), which will be made of provided components and subcontexts.
-
-You can refer to the [KOIN DSL](https://github.com/Ekito/koin/wiki/Koin-DSL) for more details.
-
-## Making dependency injection
-
-Once your app is configured, you have 2 ways of handling injection in your application:
-
-* In **Android components** (Activity, Fragment etc.): use the `by inject()` lazy operator
-* In **any Kotlin component**: injection is made **by constructor**
-
-```Kotlin
-// In Android class, use the by inject() operator
-class WeatherActivity() : AppCompatActivity() {
-
-    // inject my Presenter 
-    val presenter by inject<WeatherPresenter>()
-
-    // you can use your injected dependencies anywhere
-}
-```
-
-```Kotlin
-// In pure Kotlin class, All is injected in constructor
-class WeatherPresenter(val weatherRepository: WeatherRepository) {
-
-    // you can use your dependencies here
-}
-```
-
-For ViewModel or others classes, use the `KoinComponent` interface.
-
-## Koin Components
-
-`KoinComponent` is a Kotlin **interface** to help you **bring the Koin features on any class**. By adding this interface, you will be able to use following functions:
-
-* Injection by `inject()` & `property()`
-* Write any property with `setProperty()`
-* release a context with `releaseContext()`
-* release some properties with `releaseProperties()`
-
-You need to start a Koin context (usally `startKoin()`), to be able to use any module and dependencies.
-
-In Android, the following classes have already *KoinComponent* features: `Application`,`Context`, `Activity`, `Fragment`, `Service`
-
-
-
-## Working with properties
-
-Declare any property from any `KoinComponent` :
-
-```Kotlin
-// Set property key with its value
-setProperty("key",value)
-```
-
-You can also use any property in your Koin module with `getProperty("key")` or inject in an Android class with `by property("key")`
-
-You can also easily bind any Android property:
-
-
-```Kotlin
-// bind R.string.server_url to Koin WeatherModule.SERVER_URL
-bindString(R.string.server_url, WeatherModule.SERVER_URL)
-```
-
-
-
-## Named dependencies
-
-You can provide a name to a provided component:
-
-```Kotlin
-class WeatherModule : AndroidModule() {
-    override fun context() = applicationContext {
-           provide("MyPresenter") { WeatherPresenter() }
+        // Let's use our ViewModel
+        Log.i("MyActivity","ViewModel : ${myViewModel.sayHello()}")
     }
 }
 ```
 
-To get a component with its name, in an Android class:
-```Kotlin
-class WeatherActivity : AppcompatActivity(){
-    val presenter by inject<WeatherPresenter>("MyPresenter")
+## Your first SparkJava Controller with Koin
+
+### Gradle Setup
+
+First, add the Koin dependency like below:
+
+```kotlin
+// Add Jcenter to your repositories if needed
+repositories {
+    jcenter()    
+}
+dependencies {
+    // Koin for Kotlin apps
+    compile 'org.koin:koin-spark:{{ site.current_version }}'
 }
 ```
 
-or in constructor:
-```Kotlin
-class WeatherModule : AndroidModule() {
-    override fun context() = applicationContext {
-           provide("MyPresenter") { WeatherPresenter() }
-           // inject name dependency
-           provide { WeatherView(get("MyPresenter")) }
-    }
+### Service & Repository
+
+Let's write our Service, a component that will ask Repository for data:
+
+```kotlin
+interface HelloService {
+    fun sayHello(): String
+}
+
+class HelloServiceImpl(val helloRepository: HelloRepository) : HelloService {
+    override fun sayHello() = "Hello ${helloRepository.getHello()} !"
 }
 ```
 
+and our Repository, which provide data:
 
-## Managing context life cycle
+```kotlin
+interface HelloRepository {
+    fun getHello(): String
+}
 
-One of the biggest value of Koin, is the ability to drop any instances from a given context, to suits your components life cycle. At any moment, you can use the `releaseContext()` function to release all instances from a context.
+class HelloRepositoryImpl : HelloRepository {
+    override fun getHello(): String = "Spark & Koin"
+}
+```
 
-You can use the `ContextAwareActivity` or `ContextAwareFragent` to automatically drop an associated context:
+Finally, we need an HTTP Controller to ceathe the HTTP Route
 
-```Kotlin
-// A module with a context
-class WeatherModule : AndroidModule() {
-    override fun context() = applicationContext {
-        context(name = "WeatherActivity") {
-            provide { WeatherPresenter(get(), get()) }
+```kotlin
+class HelloController(val service: HelloService){
+    init {
+        get("/hello") {
+            service.sayHello()
         }
     }
 }
+```
 
-class WeatherActivity : ContextAwareActivity(), WeatherContract.View {
-    
-    // associated context name
-    override val contextName = "WeatherActivity"
-    
-    override val presenter by inject<WeatherPresenter>()
+### Declare your dependencies
 
-    //will call releaseContext("WeatherActivity") on onPause() - drop WeatherPresenter instance
+Let's assemble our components with a Koin module:
+
+```kotlin
+val helloAppModule = applicationContext {
+    bean { HelloServiceImpl(get()) as HelloService } // get() Will resolve HelloRepository
+    bean { HelloRepositoryImpl() as HelloRepository }
+    controller { HelloController(get()) } // get() Will resolve HelloService
 }
 ```
 
-Up to you to adapt it to your project if need, you are not forced to use those ContextAware components. You can make like follow:
+### Start and Inject
+
+Finally, let's start Koin:
 
 ```kotlin
-
-abstract class MyCustomActivity : AppCompatActivity() {
-
-    abstract val contextName: String
-
-    override fun onPause() {
-        releaseContext(contextName)
-        super.onPause()
+fun main(vararg args: String) {
+    // Start Spark server & Koin with given modules
+    start(modules = listOf(helloAppModule)) {
+        // will run HelloController
+        runControllers()
     }
 }
-
 ```
 
+<div class="alert alert-primary" role="alert">
+The <b>runControllers()</b> instantiate any component declared with <b>controller</b> keyword.
+</div>
 
-## Checking your modules
+That's it! You're ready to go.
 
-KOIN is an internal DSL: all your modules evolves directly with your code (if you change a component, it will also impact your modules). 
+## Unit Testing with Koin
 
-You can check your modules with `KoinTest.dryRun()` (launch all your modules and try to inject each component). Better is to place it in your tests folder and check it regulary - ensure everything is injected correctly.
+### Gradle Setup
 
-in a JUnit test file:
+First, add the Koin dependency like below:
 
-```kotlin
-class MyTest : KoinTest {
-	@Test
-	fun dryRun(){
-	     // start Koin
-	     startKoin(/* list of modules */)
-	     // dry run of given module list
-	     dryRun()
-	}
+```gradle
+// Add Jcenter to your repositories if needed
+repositories {
+    jcenter()    
+}
+dependencies {
+    // Koin testing tools
+    testcompile 'org.koin:koin-test:{{ site.current_version }}'
 }
 ```
 
+## Declared dependencies
 
-## Testing
-
-You can also use Koin for your tests. You can extend the `KoinTest` interface to inject any component from Koin context: 
+Let's create a Repository to provide some data (`giveHello()`):
 
 ```kotlin
-class LocalWeatherPresenterTest : KoinTest {
-    
-    // Directly injected
-    val presenter by inject<WeatherContract.Presenter>()
+interface Repository {
+    fun giveHello()
+}
 
-    @Mock lateinit var view: WeatherContract.View
+class MyRepository() : Repository {
+    override fun giveHello() = "Hello Koin"
+}
+```
+
+A Presenter class, for consuming this data:
+
+```kotlin
+// Use Repository - injected by constructor by Koin
+class MyPresenter(val repository : Repository){
+    fun sayHello() = repository.giveHello()
+}
+```
+
+Use the `applicationContext` function to declare a module. Let's declare our first component:
+
+```kotlin
+// Koin module
+val myModule : Module = applicationContext {
+    bean { MyPresenter(get()) } // get() will resolve Repository instance
+    bean { MyRepository() as Repository }
+}
+```
+
+## Writing our first Test
+
+To make our first test, let's write a simple Junit test file and extend it with `KoinTest`. We will be able then, to use `by inject()` operators.
+
+```kotlin
+class FirstTest : KoinTest {
+
+    val presenter : MyPresenter by inject()
+    val repository : Repository by inject()
 
     @Before
-    fun before() {
-        // Mocks
-        MockitoAnnotations.initMocks(this)
-        // Koin context
-        startKoin(testLocalDatasource())
+    fun before(){
+        startKoin(listOf(myModule))
+    }
 
-        presenter.view = view
+    @After
+    fun after(){
+        closeKoin()
     }
 
     @Test
-    fun testDisplayWeather() {
-        Assert.assertNotNull(presenter)
-
-        val locationString = "Paris, france"
-        presenter.getWeather(locationString)
-
-        Mockito.verify(view).displayWeather(any(), any())
+    fun testSayHello() {
+        assertEquals(repository.giveHello(), presenter.sayHello())
     }
 }
-
 ```
 
-# The Sample App
+# The KOIN DSL in 5 minutes
 
-The [*koin-sample-app*](https://github.com/Ekito/koin/tree/master/samples/android-weatherapp) application offers a complete application sample, with MVP Android style. 
+## Keywords
+
+A quick recap of the Koin DSL keywords:
+
+* `applicationContext` - create a Koin Module
+* `factory` - provide a *factory* bean definition
+* `bean` - provide a bean definition
+* `bind` - additional Kotlin type binding for given bean definition
+* `get` - resolve a component dependency
+* `getProperty` - resolve a property
+* `context` - declare a logical context
+
+Special keywords:
+
+* `viewModel` - declare an Android ViewModel (koin-android-architetcure only)
+* `controller` - declare a SparkJava controller (koin-spark only)
+
+**Deprecated**: `provide` has been deprecated in favor to aliases. `bean ~ provide` and `factory ~ provide(isSingleton=false)`
 
 
-# Documentation
+## Writing a module
 
-#### Documentation rewriting is in progress ... check incoming new web site for more info.
+Here below the Koin DSL keywords you need to know, to write your module. To declare a module, use the `applicationContext` function:
+
+```kotlin
+val myModule = applicationContext {
+   // your dependencies here
+}
+```
+
+The `applicationContext` lambda function is where you will write your definitions. `myModule` is the *Koin module*
+
+To define your components, use the following keywords:
+
+* `bean` - define a singleton (create only one instance)
+*  `factory` - define a factory (create a new instance each time)
+
+*_Deprecated_*: `provide` keyword is now deprecated. Please use `bean` or `factory`
+
+Below a simple definition of a `MyRepository` singleton:
+
+```kotlin
+class MyRepository()
+
+val myModule = applicationContext {
+   bean { MyRepository() }
+}
+```
+
+## Binding interfaces or several types
+
+To bind a component with its interface, we have 2 solutions. Given an interface and its implmentation:
+
+```kotlin
+class MyRepositoryImpl()
+interface MyRepository
+```
+
+We can write it:
+
+* `bean { MyRepositoryImpl() as MyRepository }` - will create an instance of type `MyRepository`
+* `bean { MyRepositoryImpl() } bind MyRepository::class` - will create an instance of type `MyRepositoryImpl` and will accept to bind on type `MyRepository`
+
+*You can use the `bind` keyword with a class several times: `bind Class1::class bind Class2::class`
+
+
+## Multiple definitions of the same type
+
+If you have mulitple definitions of the same type, Koin can't guess which instance to use. Then, you have to name each instance to clearly specify which instance to use. `bean` and `factory` have the `name` parameter (default parameter).
+
+```kotlin
+class MyLocalRepositoryImpl()
+class MyRemoteRepositoryImpl()
+interface MyRepository
+```
+
+we will write our module like:
+
+```kotlin
+val myModule = applicationContext {
+   bean("local") { MyLocalRepositoryImpl() as  MyRepository }
+   bean("remote") { MyRemoteRepositoryImpl() as  MyRepository }
+}
+```
+
+
+## Resolving a dependency
+
+Koin push you to use **constructor injection** to bind your component. Given classes:
+
+```kotlin
+class ComponentA()
+class ComponentB(val componentA : ComponentA)
+```
+
+We wil use the `get()` function to resolve a dependency:
+
+```kotlin
+val myModule = applicationContext {
+   bean { ComponentA() }
+   bean { ComponentB(get()) }
+}
+```
+
+## Using multiple modules / Module import
+
+Every definition and module is lazy be default in Koin. This means that you can assemble several modules, by using the list of desired modules. Given some classes:
+
+```kotlin
+class ComponentA()
+class ComponentB(val componentA : ComponentA)
+```
+
+And the two modules to declare it:
+
+```kotlin
+val myModule1 = applicationContext {
+   bean { ComponentA() }
+}
+```
+
+```kotlin
+val myModule2 = applicationContext {
+   bean { ComponentB(get()) }
+}
+```
+
+Just start the module list together: 
+
+```kotlin
+// Android Start
+startKoin(this,listOf(module1,module2))
+```
+
+```kotlin
+// Kotlin/Spark Start
+startKoin(listOf(module1,module2))
+```
+
+
+# Developer Guides
+
+### [Android Developer Guide](https://insert-koin.io/docs/1.0/developer-guides/android/) - Application samples about MVP & MVVM styles
+
 
 # Articles
 
+* [Koin 0.9.0 - Getting close to stable](https://medium.com/koin-developers/koin-0-9-0-getting-close-to-stable-release-74df9bb9e181)
+* [Unlock your Android ViewModel power with Koin](https://medium.com/@giuliani.arnaud/unlock-your-android-viewmodel-power-with-koin-23eda8f493be)
+* [Koin + Spark = ❤️](https://www.ekito.fr/people/sparkjava-and-koin/)
+* [koin 0.8.2 Improvements bugfixes and crash fix](https://medium.com/koin-developers/koin-0-8-2-improvements-bugfixes-and-crash-fix-6b6809fc1dd2)
+* [Koin release 0.8.0](https://medium.com/koin-developers/koin-released-in-0-8-0-welcome-to-koin-spark-koin-android-architecture-f6270a7d4808)
+* [Push SparkJava to the next level](https://medium.com/koin-developers/pushing-sparkjava-to-the-next-level-with-koin-ed1f0b80953e) ([Kotlin Weekly issue 73](http://mailchi.mp/kotlinweekly/kotlin-weekly-73), [DZone.com](https://dzone.com/articles/push-sparkjava-to-the-next-level-with-koin) )
+* [When Koin met Ktor ...](https://medium.com/koin-developers/when-koin-met-ktor-c3b2395662bf) ([Kotlin Weekly issue 72](https://us12.campaign-archive.com/?u=f39692e245b94f7fb693b6d82&id=3135ae0cf5))
 * [Moving from Dagger to Koin - Simplify your Android development](https://medium.com/@giuliani.arnaud/moving-from-dagger-to-koin-simplify-your-android-development-e8c61d80cddb) - ([Kotlin Weekly issue 66](http://mailchi.mp/kotlinweekly/kotlin-weekly-66?e=e8a57c719f) & [Android Weekly issue 282](http://androidweekly.net/issues/issue-282))
 * [Kotlin Weekly #64](http://mailchi.mp/kotlinweekly/kotlin-weekly-64?e=e8a57c719f)
 * [Insert Koin for dependency injection](https://www.ekito.fr/people/insert-koin-for-dependency-injection/)
 * [Better dependency injection for Android](https://proandroiddev.com/better-dependency-injection-for-android-567b93353ad)
 
-# Contact & Support
 
-## Slack
-Check the [kotlin slack community](https://kotlinlang.org/community/) and join **#koin** channel
+# Follow us
 
-## Stackoverflow
+### Website - [https://insert-koin.io](https://insert-koin.io)
 
-Use the `Koin` & `Kotlin` tags to mark your questions. [Koin @ Stackoverflow](https://stackoverflow.com/search?q=koin)
+### Twitter - [@insertkoin_io](https://twitter.com/insertkoin_io)
 
-## Github
-Don't hesitate to open an issue to discuss about your needs or if you don't a feature for example.
+### Medium - [Koin Developers Hub](https://medium.com/koin-developers)
+
+### Slack - [Kotlin Slack](https://kotlinlang.org/community/) on **#koin** channel
+
+
+
+
+
+
 

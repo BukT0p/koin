@@ -17,7 +17,24 @@ class PropertyRegistry {
      * @param key - key property
      * @throws MissingPropertyException if property is missing
      */
-    inline fun <reified T> getProperty(key: String): T = properties[key] as T? ?: throw MissingPropertyException("Can't find property '$key'")
+    inline fun <reified T> getProperty(key: String): T =
+        getValue<T>(key) ?: throw MissingPropertyException("Can't find property '$key'")
+
+    /**
+     * Retrieve value or null
+     * @param key
+     */
+    inline fun <reified T> getValue(key: String): T? {
+        val clazzName = T::class.java.simpleName
+        val value = properties[key]
+        return if (value is String && clazzName != "String") {
+            when (clazzName) {
+                "Integer" -> value.toIntOrNull()
+                "Float" -> value.toFloatOrNull()
+                else -> value
+            } as T?
+        } else value as? T?
+    }
 
     /**
      * Get value for given property or get default value if property key is missing
@@ -25,14 +42,16 @@ class PropertyRegistry {
      * @param defaultValue - default value for key
      */
     inline fun <reified T> getProperty(key: String, defaultValue: T): T {
-        return properties[key] as T? ?: defaultValue
+        val value = getValue(key) ?: defaultValue
+        Koin.logger.debug("[Property] get $key << '$value'")
+        return value
     }
 
     /**
      * Add properties
      */
     fun addAll(props: Map<String, Any>) {
-        Koin.logger.log("additional properties : ${props.size}")
+        Koin.logger.debug("[Property] add properties ${props.size}")
         properties += props
     }
 
@@ -42,9 +61,9 @@ class PropertyRegistry {
      */
     fun import(properties: Properties): Int {
         return properties.keys
-                .filter { it is String && properties[it] != null }
-                .map { add(it as String, properties[it]!!) }
-                .count()
+            .filter { it is String && properties[it] != null }
+            .map { add(it as String, properties[it]!!) }
+            .count()
     }
 
     /**
@@ -56,6 +75,7 @@ class PropertyRegistry {
      * Add property
      */
     fun add(key: String, value: Any) {
+        Koin.logger.debug("[Property] set $key >> '$value'")
         properties += Pair(key, value)
     }
 
@@ -63,7 +83,7 @@ class PropertyRegistry {
      * Delete a property
      */
     fun delete(key: String) {
-        Koin.logger.log("delete property $key")
+        Koin.logger.debug("[Property] delete $key")
         properties.remove(key)
     }
 

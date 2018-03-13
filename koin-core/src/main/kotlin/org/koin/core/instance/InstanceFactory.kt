@@ -1,38 +1,34 @@
 package org.koin.core.instance
 
-import org.koin.Koin
 import org.koin.core.bean.BeanDefinition
-import org.koin.core.bean.BeanRegistry
-import org.koin.error.BeanDefinitionException
+import org.koin.dsl.context.ParameterProvider
 import org.koin.error.BeanInstanceCreationException
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.reflect.KClass
 
 /**
  * Instance factory - handle objects creation against BeanRegistry
  * @author - Arnaud GIULIANI
  */
-class InstanceFactory(val beanRegistry: BeanRegistry) {
+class InstanceFactory() {
 
-    val instances = ConcurrentHashMap<BeanDefinition<*>, Any>()
+    val instances = HashMap<BeanDefinition<*>, Any>()
 
     /**
      * Retrieve or create bean instance
+     * @return Instance / has been created
      */
-    fun <T> retrieveInstance(def: BeanDefinition<*>): T {
+    fun <T> retrieveInstance(def: BeanDefinition<*>, p: ParameterProvider): Pair<T, Boolean> {
         // Factory
         return if (def.isNotASingleton()) {
-            Koin.logger.log("Create instance for [$def]")
-            createInstance(def)
+            Pair(createInstance(def, p), true)
         } else {
             // Singleton
-            var instance = findInstance<T>(def)
-            if (instance == null) {
-                Koin.logger.log("Create instance for [$def]")
-                instance = createInstance(def)
+            val found: T? = findInstance<T>(def)
+            val instance: T = found ?: createInstance(def, p)
+            val created = found == null
+            if (created) {
                 saveInstance(def, instance)
             }
-            instance ?: throw BeanInstanceCreationException("Couldn't create instance for $def")
+            Pair(instance, created)
         }
     }
 
@@ -43,6 +39,7 @@ class InstanceFactory(val beanRegistry: BeanRegistry) {
     /**
      * Find existing instance
      */
+    @Suppress("UNCHECKED_CAST")
     private fun <T> findInstance(def: BeanDefinition<*>): T? {
         val existingClass = instances.keys.firstOrNull { it == def }
         return if (existingClass != null) {
@@ -55,18 +52,15 @@ class InstanceFactory(val beanRegistry: BeanRegistry) {
     /**
      * create instance for given bean definition
      */
-    private fun <T> createInstance(def: BeanDefinition<*>): T {
-        val scope = beanRegistry.getScopeForDefinition(def)
-        if (scope == null) throw BeanDefinitionException("Can't create bean $def in : $scope -- Scope has not been declared")
-        else {
-            try {
-                val instance = def.definition.invoke() as Any
-                instance as T
-                return instance
-            } catch (e: Throwable) {
-                Koin.logger.err("Can't create [$def] due to error : \n${e.stackTrace.take(10).joinToString(separator = "\n")}")
-                throw BeanInstanceCreationException("Can't create bean $def due to error : $e")
-            }
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> createInstance(def: BeanDefinition<*>, p: ParameterProvider): T {
+        try {
+            val instance = def.definition.invoke(p) as Any
+            instance as T
+            return instance
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            throw BeanInstanceCreationException("Can't create bean $def due to error :\n\t$e")
         }
     }
 
@@ -75,13 +69,6 @@ class InstanceFactory(val beanRegistry: BeanRegistry) {
      */
     fun dropAllInstances(definitions: List<BeanDefinition<*>>) {
         definitions.forEach { instances.remove(it) }
-    }
-
-    /**
-     * Drop instance for given bean definition class
-     */
-    fun dropInstance(clazz: KClass<*>) {
-        dropAllInstances(instances.keys().toList().filter { it.clazz == clazz })
     }
 
     /**

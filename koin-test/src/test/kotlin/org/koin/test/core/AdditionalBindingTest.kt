@@ -3,44 +3,34 @@ package org.koin.test.core
 import org.junit.Assert
 import org.junit.Assert.fail
 import org.junit.Test
-import org.koin.Koin
 import org.koin.core.scope.Scope
-import org.koin.dsl.module.Module
-import org.koin.log.PrintLogger
+import org.koin.dsl.module.applicationContext
 import org.koin.standalone.StandAloneContext.startKoin
 import org.koin.standalone.get
-import org.koin.test.AbstractKoinTest
+import org.koin.test.AutoCloseKoinTest
 import org.koin.test.ext.junit.assertContexts
 import org.koin.test.ext.junit.assertDefinedInScope
 import org.koin.test.ext.junit.assertDefinitions
 import org.koin.test.ext.junit.assertRemainingInstances
 
 
-class AdditionalBindingTest : AbstractKoinTest() {
+class AdditionalBindingTest : AutoCloseKoinTest() {
 
-    class BoundModule() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentA() } bind (InterfaceComponent::class)
-        }
+    val BoundModule = applicationContext {
+        bean { ComponentA() } bind InterfaceComponent::class
     }
 
-    class NotBoundModule() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentA() }
-        }
+    val NotBoundModule = applicationContext {
+        bean { ComponentA() }
     }
 
-    class GenericBoundModule() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentB() } bind (OtherInterfaceComponent::class)
-        }
+    val GenericBoundModule = applicationContext {
+        bean { ComponentB() } bind OtherInterfaceComponent::class
     }
 
-    class TwoBoundModule() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentB() } bind (OtherInterfaceComponent::class)
-            provide { ComponentC() } bind (OtherInterfaceComponent::class)
-        }
+    val TwoBoundModule = applicationContext {
+        bean { ComponentB() } bind OtherInterfaceComponent::class
+        bean { ComponentC() } bind OtherInterfaceComponent::class
     }
 
     class ComponentA : InterfaceComponent
@@ -60,13 +50,9 @@ class AdditionalBindingTest : AbstractKoinTest() {
         fun get(): T
     }
 
-    init {
-        Koin.logger = PrintLogger()
-    }
-
     @Test
     fun `same instance for provided & bound component`() {
-        startKoin(listOf(BoundModule()))
+        startKoin(listOf(BoundModule))
 
         val a = get<ComponentA>()
         val intf = get<InterfaceComponent>()
@@ -83,7 +69,7 @@ class AdditionalBindingTest : AbstractKoinTest() {
 
     @Test
     fun `should not bound component`() {
-        startKoin(listOf(NotBoundModule()))
+        startKoin(listOf(NotBoundModule))
 
         val a = get<ComponentA>()
 
@@ -103,7 +89,7 @@ class AdditionalBindingTest : AbstractKoinTest() {
 
     @Test
     fun `should bind generic component`() {
-        startKoin(listOf(GenericBoundModule()))
+        startKoin(listOf(GenericBoundModule))
 
         val b = get<ComponentB>()
         val intf = get<OtherInterfaceComponent<String>>()
@@ -120,7 +106,7 @@ class AdditionalBindingTest : AbstractKoinTest() {
 
     @Test
     fun `should not bind generic component`() {
-        startKoin(listOf(TwoBoundModule()))
+        startKoin(listOf(TwoBoundModule))
 
         try {
             get<OtherInterfaceComponent<String>>()

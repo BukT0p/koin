@@ -5,65 +5,60 @@ import org.junit.Assert.fail
 import org.junit.Test
 import org.koin.Koin
 import org.koin.core.scope.Scope
-import org.koin.dsl.module.Module
+import org.koin.dsl.module.applicationContext
 import org.koin.error.BeanInstanceCreationException
+import org.koin.error.ContextVisibilityException
 import org.koin.error.DependencyResolutionException
 import org.koin.log.PrintLogger
 import org.koin.standalone.StandAloneContext.startKoin
 import org.koin.standalone.get
-import org.koin.test.AbstractKoinTest
+import org.koin.test.AutoCloseKoinTest
 import org.koin.test.ext.junit.assertContexts
 import org.koin.test.ext.junit.assertDefinedInScope
 import org.koin.test.ext.junit.assertDefinitions
 import org.koin.test.ext.junit.assertScopeParent
 
-class StackTest : AbstractKoinTest() {
+class StackTest : AutoCloseKoinTest() {
 
-    class FlatContextsModule() : Module() {
-        override fun context() = applicationContext {
+    val FlatContextsModule = applicationContext {
 
-            provide { ComponentA() }
+        bean { ComponentA() }
+
+        context(name = "B") {
+            bean { ComponentB(get()) }
+        }
+
+        context(name = "C") {
+            bean { ComponentC(get()) }
+        }
+    }
+
+    val HierarchyContextsModule = applicationContext {
+        context(name = "A") {
+            bean { ComponentA() }
 
             context(name = "B") {
-                provide { ComponentB(get()) }
-            }
+                bean { ComponentB(get()) }
 
-            context(name = "C") {
-                provide { ComponentC(get()) }
-            }
-        }
-    }
-
-    class HierarchyContextsModule() : Module() {
-        override fun context() = applicationContext {
-            context(name = "A") {
-                provide { ComponentA() }
-
-                context(name = "B") {
-                    provide { ComponentB(get()) }
-
-                    context(name = "C") {
-                        provide { ComponentC(get()) }
-                    }
+                context(name = "C") {
+                    bean { ComponentC(get()) }
                 }
-
             }
-            provide { ComponentD(get()) }
+
         }
+        bean { ComponentD(get()) }
     }
 
-    class NotVisibleContextsModule() : Module() {
-        override fun context() = applicationContext {
+    val NotVisibleContextsModule = applicationContext {
 
-            provide { ComponentB(get()) }
+        bean { ComponentB(get()) }
 
-            context(name = "A") {
-                provide { ComponentA() }
-            }
+        context(name = "A") {
+            bean { ComponentA() }
+        }
 
-            context(name = "D") {
-                provide { ComponentD(get()) }
-            }
+        context(name = "D") {
+            bean { ComponentD(get()) }
         }
     }
 
@@ -72,10 +67,10 @@ class StackTest : AbstractKoinTest() {
     class ComponentC(val componentA: ComponentA)
     class ComponentD(val componentB: ComponentB)
 
+
     @Test
     fun `has flat visibility`() {
-        Koin.logger = PrintLogger()
-        startKoin(listOf(FlatContextsModule()))
+        startKoin(listOf(FlatContextsModule))
 
         assertContexts(3)
         assertDefinitions(3)
@@ -94,8 +89,7 @@ class StackTest : AbstractKoinTest() {
 
     @Test
     fun `has hierarchic visibility`() {
-        Koin.logger = PrintLogger()
-        startKoin(listOf(HierarchyContextsModule()))
+        startKoin(listOf(HierarchyContextsModule))
 
         Assert.assertNotNull(get<ComponentC>())
         Assert.assertNotNull(get<ComponentB>())
@@ -104,25 +98,27 @@ class StackTest : AbstractKoinTest() {
             get<ComponentD>()
             fail()
         } catch (e: BeanInstanceCreationException) {
-
+            e.printStackTrace()
         }
     }
 
     @Test
     fun `not good visibility context`() {
         Koin.logger = PrintLogger()
-        startKoin(listOf(NotVisibleContextsModule()))
+        startKoin(listOf(NotVisibleContextsModule))
 
         Assert.assertNotNull(get<ComponentA>())
         try {
             get<ComponentB>()
             fail()
         } catch (e: BeanInstanceCreationException) {
+            e.printStackTrace()
         }
         try {
             get<ComponentD>()
             fail()
-        } catch (e: DependencyResolutionException) {
+        } catch (e: ContextVisibilityException) {
+            e.printStackTrace()
         }
     }
 

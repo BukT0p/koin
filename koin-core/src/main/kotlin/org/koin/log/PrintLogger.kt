@@ -4,8 +4,12 @@ package org.koin.log
  * Logger that print on system.out
  */
 class PrintLogger : Logger {
+    override fun debug(msg: String) {
+        println("(KOIN) :: [DEBUG] :: $msg")
+    }
+
     override fun log(msg: String) {
-        println("(KOIN) :: $msg")
+        println("(KOIN) :: [INFO] :: $msg")
     }
 
     override fun err(msg: String) {

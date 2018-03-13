@@ -2,6 +2,8 @@ package org.koin.dsl.context
 
 import org.koin.KoinContext
 import org.koin.core.bean.BeanDefinition
+import org.koin.core.bean.Definition
+import org.koin.core.parameter.Parameters
 import org.koin.core.scope.Scope
 
 /**
@@ -33,35 +35,51 @@ class Context(val name: String = Scope.ROOT, val koinContext: KoinContext) {
     }
 
     /**
-     * Provide a bean definition
+     * Provide a bean definition - default provider definition
      * @param name
      * @param isSingleton
      */
-    inline fun <reified T : Any> provide(name: String = "", isSingleton: Boolean = true, noinline definition: () -> T): BeanDefinition<T> {
-        val beanDefinition = BeanDefinition(name, T::class, isSingleton, definition = definition)
+    @Deprecated("use `bean` (for singleton instances) or `factory` (for factory instances)")
+    inline fun <reified T : Any> provide(
+        name: String = "",
+        isSingleton: Boolean = true,
+        noinline definition: Definition<T>
+    ): BeanDefinition<T> {
+        val beanDefinition = BeanDefinition(name, T::class, isSingleton = isSingleton, definition = definition)
         definitions += beanDefinition
         return beanDefinition
     }
 
     /**
-     * Provide a bean definition - as factory (recreate instance each time)
+     * Provide a bean definition - alias to provide
+     * @param name
      */
-    inline fun <reified T : Any> provideFactory(name: String = "", noinline definition: () -> T): BeanDefinition<T> {
-        val beanDefinition = BeanDefinition(name, T::class, false, definition = definition)
-        definitions += beanDefinition
-        return beanDefinition
+    inline fun <reified T : Any> bean(name: String = "", noinline definition: Definition<T>): BeanDefinition<T> {
+        return provide(name, true, definition)
+    }
+
+    /**
+     * Provide a factory bean definition - factory provider
+     * (recreate instance each time)
+     *
+     * @param name
+     */
+    inline fun <reified T : Any> factory(name: String = "", noinline definition: Definition<T>): BeanDefinition<T> {
+        return provide(name, false, definition)
     }
 
     /**
      * Resolve a component
      */
-    inline fun <reified T : Any> get(): T = koinContext.resolveByClass()
+    inline fun <reified T : Any> get(noinline parameters: Parameters = { emptyMap() }): T =
+        koinContext.resolveByClass(parameters)
 
     /**
      * Resolve a component
      * @param name : component name
      */
-    inline fun <reified T : Any> get(name: String): T = koinContext.resolveByName(name)
+    inline fun <reified T : Any> get(name: String, noinline parameters: Parameters = { emptyMap() }): T =
+        koinContext.resolveByName(name, parameters)
 
     /**
      * Retrieve a property
@@ -74,7 +92,8 @@ class Context(val name: String = Scope.ROOT, val koinContext: KoinContext) {
      * @param key - property key
      * @param defaultValue - default value
      */
-    inline fun <reified T> getProperty(key: String, defaultValue : T) = koinContext.propertyResolver.getProperty(key,defaultValue)
+    inline fun <reified T> getProperty(key: String, defaultValue: T) =
+        koinContext.propertyResolver.getProperty(key, defaultValue)
 
     // String display
     override fun toString(): String = "Context[$name]"

@@ -5,44 +5,38 @@ import org.junit.Assert
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.koin.core.scope.Scope
-import org.koin.dsl.module.Module
+import org.koin.dsl.module.applicationContext
 import org.koin.standalone.StandAloneContext.startKoin
 import org.koin.standalone.get
-import org.koin.test.AbstractKoinTest
+import org.koin.test.AutoCloseKoinTest
 import org.koin.test.ext.junit.assertContexts
 import org.koin.test.ext.junit.assertDefinedInScope
 import org.koin.test.ext.junit.assertDefinitions
 import org.koin.test.ext.junit.assertRemainingInstances
 
-class MultipleModuleTest : AbstractKoinTest() {
+class MultipleModuleTest : AutoCloseKoinTest() {
 
     class ComponentA
     class ComponentB(val componentA: ComponentA)
     class ComponentC(val componentA: ComponentA, val componentB: ComponentB)
 
-    class SimpleModuleA() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentA() }
-        }
+    val SimpleModuleA = applicationContext {
+        bean { ComponentA() }
     }
 
-    class SimpleModuleB() : Module() {
-        override fun context() = applicationContext {
-            provide { ComponentB(get()) }
-        }
+    val SimpleModuleB = applicationContext {
+        bean { ComponentB(get()) }
     }
 
-    class SimpleModuleC() : Module() {
-        override fun context() = applicationContext {
-            context(name = "C") {
-                provide { ComponentC(get(), get()) }
-            }
+    val SimpleModuleC = applicationContext {
+        context(name = "C") {
+            bean { ComponentC(get(), get()) }
         }
     }
 
     @Test
     fun `load mulitple modules`() {
-        startKoin(listOf(SimpleModuleA(), SimpleModuleB(), SimpleModuleC()))
+        startKoin(listOf(SimpleModuleA, SimpleModuleB, SimpleModuleC))
 
         assertRemainingInstances(0)
         assertDefinitions(3)

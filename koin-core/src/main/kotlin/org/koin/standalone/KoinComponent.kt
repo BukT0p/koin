@@ -1,6 +1,7 @@
 package org.koin.standalone
 
 import org.koin.KoinContext
+import org.koin.core.parameter.Parameters
 
 /**
  * Koin component
@@ -11,14 +12,16 @@ interface KoinComponent
  * inject lazily given dependency for KoinComponent
  * @param name - bean name / optional
  */
-inline fun <reified T> KoinComponent.inject(name: String = "") = kotlin.lazy { (StandAloneContext.koinContext as KoinContext).get<T>(name) }
+inline fun <reified T> KoinComponent.inject(name: String = "", noinline parameters: Parameters = { emptyMap() }) =
+    kotlin.lazy { (StandAloneContext.koinContext as KoinContext).get<T>(name, parameters) }
 
 /**
  * inject lazily given property for KoinComponent
  * @param key - key property
  * throw MissingPropertyException if property is not found
  */
-inline fun <reified T> KoinComponent.property(key: String) = kotlin.lazy { (StandAloneContext.koinContext as KoinContext).getProperty<T>(key) }
+inline fun <reified T> KoinComponent.property(key: String) =
+    kotlin.lazy { (StandAloneContext.koinContext as KoinContext).getProperty<T>(key) }
 
 /**
  * inject lazily given property for KoinComponent
@@ -28,7 +31,8 @@ inline fun <reified T> KoinComponent.property(key: String) = kotlin.lazy { (Stan
  * @param defaultValue - default value if property is missing
  *
  */
-inline fun <reified T> KoinComponent.property(key: String, defaultValue: T) = kotlin.lazy { (StandAloneContext.koinContext as KoinContext).getProperty(key, defaultValue) }
+inline fun <reified T> KoinComponent.property(key: String, defaultValue: T) =
+    kotlin.lazy { (StandAloneContext.koinContext as KoinContext).getProperty(key, defaultValue) }
 
 
 /**
@@ -40,14 +44,16 @@ private fun context() = (StandAloneContext.koinContext as KoinContext)
  * Retrieve given dependency for KoinComponent
  * @param name - bean name / optional
  */
-inline fun <reified T> KoinComponent.get(name: String = "") = (StandAloneContext.koinContext as KoinContext).get<T>(name)
+inline fun <reified T> KoinComponent.get(name: String = "", noinline parameters: Parameters = { emptyMap() }) =
+    (StandAloneContext.koinContext as KoinContext).get<T>(name, parameters)
 
 /**
  * Retrieve given property for KoinComponent
  * @param key - key property
  * throw MissingPropertyException if property is not found
  */
-inline fun <reified T> KoinComponent.getProperty(key: String) = (StandAloneContext.koinContext as KoinContext).getProperty<T>(key)
+inline fun <reified T> KoinComponent.getProperty(key: String) =
+    (StandAloneContext.koinContext as KoinContext).getProperty<T>(key)
 
 /**
  * Retrieve given property for KoinComponent
@@ -57,7 +63,8 @@ inline fun <reified T> KoinComponent.getProperty(key: String) = (StandAloneConte
  * @param defaultValue - default value if property is missing
  *
  */
-inline fun <reified T> KoinComponent.getProperty(key: String, defaultValue: T) = (StandAloneContext.koinContext as KoinContext).getProperty(key, defaultValue)
+inline fun <reified T> KoinComponent.getProperty(key: String, defaultValue: T) =
+    (StandAloneContext.koinContext as KoinContext).getProperty(key, defaultValue)
 
 /**
  * set a property
